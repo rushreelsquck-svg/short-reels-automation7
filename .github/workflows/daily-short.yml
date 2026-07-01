@@ -36,6 +36,8 @@ jobs:
           YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
           YT_API_KEY: ${{ secrets.YT_API_KEY }}
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_TTS_VOICE: "onyx"
           NEWS_REGION: "US"
           YT_CATEGORY_ID: "27"
           YT_PRIVACY_STATUS: "scheduled"

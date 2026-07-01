@@ -2,17 +2,14 @@
 build_video.py — multi-scene channels
 (Bible Time, Vaults of History, The Case File, Daily Fable Story, Pantry Remedies)
 
-Assembles the final 1080x1920 vertical Short — one scene per beat/fact, each
-with its own Pexels clip, caption, and optional number badge.
-
-Same precision improvements as the news-style build_video.py:
-  - Clip stretching fixed: resize condition was inverted. Now portrait clips
-    get resize(width=W) so height exceeds H and can be cropped cleanly.
-  - Smarter clip selection: prefers highest-resolution portrait file, with a
-    2-word fallback query if the specific query returns no results.
-  - Caption font 68px → 54px, wrap 18 chars → 26, position 66% → 72%.
-    Multi-scene captions are full sentences, so the wider wrap and smaller
-    font stop them from breaking awkwardly into many short lines.
+Fixes in this version:
+  - Stretched clip: resize condition was inverted. Now correct.
+  - Subtitle clipping: position was hardcoded at 72% down regardless of caption
+    height. Long hook lines wrap to 6 lines at 54px = 542px tall, which at 1382px
+    puts the bottom at 1924px — 4px past the 1920px frame edge. Position is now
+    calculated dynamically so the bottom never goes below H - 60px.
+  - Caption font 68px → 54px, wrap 18 chars → 26, base position 66% → 72%.
+  - Smarter clip selection: highest-res portrait file, 2-word fallback query.
 """
 import math
 import os
@@ -25,7 +22,7 @@ import requests
 from PIL import Image, ImageDraw, ImageFont
 
 if not hasattr(Image, "ANTIALIAS"):
-    Image.ANTIALIAS = Image.LANCZOS  # Pillow >=10 compat shim for moviepy 1.0.3
+    Image.ANTIALIAS = Image.LANCZOS
 
 from moviepy.editor import (
     AudioFileClip,
@@ -127,18 +124,14 @@ def _fetch_pexels_clip(query, duration):
         return None
     try:
         results = _search_pexels(query, per_page=10)
-
         if not results:
             short_query = " ".join(query.split()[:2])
             if short_query and short_query != query:
                 results = _search_pexels(short_query, per_page=10)
-
         if not results:
             return None
-
         video = random.choice(results)
         return _download_and_prepare_clip(video, duration)
-
     except Exception:
         return None
 
@@ -178,11 +171,17 @@ def build_video(scenes, output_path):
         visual_clips.append(bg)
 
         caption_png = _render_caption_png(scene["caption_text"])
+        # Dynamic Y position: clamp so caption bottom never exceeds frame edge.
+        # Long hook lines wrap to 6 lines at 54px = 542px tall — at the hardcoded
+        # 72% position (1382px) that puts the bottom at 1924px, clipping the last
+        # 4px off the 1920px frame. This adjusts upward automatically when needed.
+        cap_h = caption_png.shape[0]
+        cap_top = min(int(H * 0.72), H - cap_h - 60)
         caption_clip = (
             ImageClip(caption_png)
             .set_start(t_cursor)
             .set_duration(duration)
-            .set_position(("center", int(H * 0.72)))
+            .set_position(("center", cap_top))
         )
         overlay_clips.append(caption_clip)
 

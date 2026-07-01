@@ -1,15 +1,11 @@
 """
 youtube_metadata.py
-Merges the story-specific tags/hashtags from generate_script.py with real
-trending keywords pulled from the YouTube "mostPopular" chart, then trims
-everything to YouTube's actual limits so the upload never gets rejected:
-  - tags field: 500 characters total (combined), each tag <= ~30 chars by convention
-  - title: 100 characters
-  - description: 5000 characters
+Merges the video's own tags with real YouTube trending keywords for extra
+discoverability, then trims everything to YouTube's actual limits.
 """
 import re
 
-MAX_TAGS_CHARS = 480  # leave a little headroom under YouTube's 500-char cap
+MAX_TAGS_CHARS = 480
 MAX_TITLE_CHARS = 95
 MAX_DESCRIPTION_CHARS = 4800
 
@@ -22,7 +18,7 @@ def _sanitize_tag(tag: str) -> str:
     Any of these will cause the entire upload to fail with invalidTags.
     """
     tag = re.sub(r'[<>&",]', '', tag)
-    tag = ' '.join(tag.split())  # collapse any leftover extra whitespace
+    tag = ' '.join(tag.split())
     return tag.strip()[:100]
 
 
@@ -38,25 +34,18 @@ def _dedupe_preserve_order(items):
     return out
 
 
-def build_final_metadata(script_package: dict, trending_keywords: list[str], topic: dict) -> dict:
-    title = script_package.get("title", topic.get("title", "Trending Today"))[:MAX_TITLE_CHARS]
+def build_final_metadata(video: dict, trending_keywords: list[str]) -> dict:
+    title = video.get("title", "")[:MAX_TITLE_CHARS]
 
-    hashtags = _dedupe_preserve_order(script_package.get("hashtags", ["#shorts"]))
+    hashtags = _dedupe_preserve_order(video.get("hashtags", ["#shorts"]))
     hashtag_line = " ".join(hashtags)
 
-    description_text = script_package.get("description", "").strip() or script_package.get("script", "").strip()
-
-    description_parts = [
-        description_text,
-        "",
-        f"Source story: {topic.get('source', '')}".strip(),
-        "",
-        hashtag_line,
-    ]
+    description_parts = [video.get("description", "").strip(), "", hashtag_line]
     description = "\n".join(p for p in description_parts if p)[:MAX_DESCRIPTION_CHARS]
 
-    # tags = the story-specific tags first (most relevant), then trending keywords as filler
-    combined_tags = _dedupe_preserve_order(script_package.get("tags", []) + trending_keywords + ["shorts", "entertainment", "celebrity", "popculture"])
+    combined_tags = _dedupe_preserve_order(
+        video.get("tags", []) + trending_keywords + ["shorts", "history", "historyfacts", "didyouknow"]
+    )
 
     final_tags = []
     char_budget = MAX_TAGS_CHARS
@@ -64,10 +53,6 @@ def build_final_metadata(script_package: dict, trending_keywords: list[str], top
         if len(tag) + 1 > char_budget:
             break
         final_tags.append(tag)
-        char_budget -= len(tag) + 1  # +1 for the implicit comma YouTube uses internally
+        char_budget -= len(tag) + 1
 
-    return {
-        "title": title,
-        "description": description,
-        "tags": final_tags,
-    }
+    return {"title": title, "description": description, "tags": final_tags}

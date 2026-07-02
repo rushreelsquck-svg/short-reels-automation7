@@ -1,7 +1,6 @@
 """
 main.py
-Runs the whole daily case pipeline end to end. Each stage prints progress
-so failures are easy to spot in the Actions log.
+Runs the whole daily Zero Warning pipeline end to end.
 """
 import json
 import os
@@ -9,19 +8,20 @@ import sys
 import traceback
 from pathlib import Path
 
-from generate_case import generate_case_video
+from generate_case import generate_accident_video
 from generate_audio import generate_voiceover
 from build_video import build_video
 from fetch_youtube_trending_tags import get_trending_keywords
 from youtube_metadata import build_final_metadata
 from upload_video import upload_short
+from upload_facebook import upload_reel
 
-WORKDIR = Path("/tmp/case_run")
+WORKDIR = Path("/tmp/accident_run")
 
 
 def run():
-    print("[1/5] Writing today's case video (Claude)...")
-    video = generate_case_video()
+    print("[1/5] Writing today's accident video (Claude)...")
+    video = generate_accident_video()
     print(f"      -> {video['title']}  ({len(video['beats'])} beats)")
 
     WORKDIR.mkdir(parents=True, exist_ok=True)
@@ -30,7 +30,7 @@ def run():
     print("[2/5] Generating voiceover for the hook and each beat...")
     hook_audio = str(WORKDIR / "scene_hook.mp3")
     generate_voiceover(video["hook"], hook_audio)
-    scenes.append({"audio_path": hook_audio, "visual_query": None, "caption_text": video["hook"], "number": None})
+    scenes.append({"audio_path": hook_audio, "visual_query": video.get("hook_visual_query"), "caption_text": video["hook"], "number": None})
 
     for i, beat in enumerate(video["beats"]):
         audio_path = str(WORKDIR / f"scene_{i}.mp3")
@@ -59,6 +59,9 @@ def run():
         description=final_meta["description"],
         tags=final_meta["tags"],
     )
+
+    print("[Cross-post] Posting to Facebook as a Reel...")
+    upload_reel(video_path, final_meta["description"])
 
     print(json.dumps({"video_id": video_id, "title": final_meta["title"]}, indent=2))
     return video_id

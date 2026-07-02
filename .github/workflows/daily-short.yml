@@ -1,4 +1,4 @@
-name: The Case File - Daily True Crime
+name: Zero Warning - Daily Shocking Accidents
 
 on:
   schedule:
@@ -8,9 +8,9 @@ on:
 jobs:
   build-and-upload:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 20
     permissions:
-      contents: write   # needed so the last step can commit state/used_premises.json back to the repo
+      contents: write
 
     steps:
       - name: Checkout repo
@@ -31,23 +31,26 @@ jobs:
         working-directory: scripts
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_TTS_VOICE: "onyx"
+          FB_PAGE_ID: ${{ secrets.FB_PAGE_ID }}
+          FB_PAGE_ACCESS_TOKEN: ${{ secrets.FB_PAGE_ACCESS_TOKEN }}
           YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
           YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
           YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
           YT_API_KEY: ${{ secrets.YT_API_KEY }}
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          OPENAI_TTS_VOICE: "onyx"
           NEWS_REGION: "US"
-          YT_CATEGORY_ID: "27"
+          YT_CATEGORY_ID: "22"
           YT_PRIVACY_STATUS: "scheduled"
           YT_PUBLISH_DELAY_HOURS: "3"
         run: python main.py
 
       - name: Save used-premises state
         run: |
-          git config user.name "billion-meaning-bot"
+          git config user.name "zero-warning-bot"
           git config user.email "actions@github.com"
           git add state/used_premises.json
           git diff --quiet --cached || git commit -m "Update used premises [skip ci]"
+          git pull --rebase origin main
           git push

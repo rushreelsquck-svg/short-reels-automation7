@@ -55,6 +55,23 @@ def _build_status_body():
     }
 
 
+def _sanitize_tags(tags: list[str]) -> list[str]:
+    """
+    YouTube rejects tags that contain: < > & " ' (and a few other special chars).
+    Also rejects tags that are blank or over 500 chars in total per the docs.
+    This strips the bad characters and drops any tag that ends up empty after cleaning.
+    """
+    import re
+    cleaned = []
+    for tag in tags:
+        # Remove characters YouTube explicitly rejects in tags
+        tag = re.sub(r'[<>&"\'\#]', '', tag).strip()
+        # Drop tags that are empty after cleaning or excessively long
+        if tag and len(tag) <= 100:
+            cleaned.append(tag)
+    return cleaned
+
+
 def upload_short(video_path: str, title: str, description: str, tags: list[str]) -> str:
     youtube = _get_authenticated_service()
 
@@ -62,7 +79,7 @@ def upload_short(video_path: str, title: str, description: str, tags: list[str])
         "snippet": {
             "title": title,
             "description": description,
-            "tags": tags,
+            "tags": _sanitize_tags(tags),
             "categoryId": os.environ.get("YT_CATEGORY_ID", "25"),  # 25 = News & Politics
         },
         "status": _build_status_body(),

@@ -1,9 +1,9 @@
 """
 youtube_metadata.py
-Merges the video's own tags with real YouTube trending keywords for extra
-discoverability, then trims everything to YouTube's actual limits.
+Same trimming/deduping logic as the other channels — merges the video's own
+tags with real YouTube trending keywords for extra discoverability, then
+trims everything to YouTube's actual limits.
 """
-import re
 
 MAX_TAGS_CHARS = 480
 MAX_TITLE_CHARS = 95
@@ -11,12 +11,7 @@ MAX_DESCRIPTION_CHARS = 4800
 
 
 def _sanitize_tag(tag: str) -> str:
-    """
-    Remove characters YouTube's API rejects in tags.
-    The most common culprits are & (from names like "Taylor Swift & Travis Kelce"),
-    < and > (from show titles), and " (from quoted phrases in trending keywords).
-    Any of these will cause the entire upload to fail with invalidTags.
-    """
+    import re
     tag = re.sub(r'[<>&",]', '', tag)
     tag = ' '.join(tag.split())
     return tag.strip()[:100]
@@ -35,7 +30,7 @@ def _dedupe_preserve_order(items):
 
 
 def build_final_metadata(video: dict, trending_keywords: list[str]) -> dict:
-    title = video.get("title", "")[:MAX_TITLE_CHARS]
+    title = video.get("title", "Zero Warning")[:MAX_TITLE_CHARS]
 
     hashtags = _dedupe_preserve_order(video.get("hashtags", ["#shorts"]))
     hashtag_line = " ".join(hashtags)
@@ -44,7 +39,7 @@ def build_final_metadata(video: dict, trending_keywords: list[str]) -> dict:
     description = "\n".join(p for p in description_parts if p)[:MAX_DESCRIPTION_CHARS]
 
     combined_tags = _dedupe_preserve_order(
-        video.get("tags", []) + trending_keywords + ["shorts", "history", "historyfacts", "didyouknow"]
+        video.get("tags", []) + trending_keywords + ["shorts", "accidents", "disasters", "engineeringfailures"]
     )
 
     final_tags = []

@@ -2,14 +2,17 @@
 build_video.py — multi-scene channels
 (Bible Time, Vaults of History, The Case File, Daily Fable Story, Pantry Remedies)
 
-Fixes in this version:
-  - Stretched clip: resize condition was inverted. Now correct.
-  - Subtitle clipping: position was hardcoded at 72% down regardless of caption
-    height. Long hook lines wrap to 6 lines at 54px = 542px tall, which at 1382px
-    puts the bottom at 1924px — 4px past the 1920px frame edge. Position is now
-    calculated dynamically so the bottom never goes below H - 60px.
-  - Caption font 68px → 54px, wrap 18 chars → 26, base position 66% → 72%.
-  - Smarter clip selection: highest-res portrait file, 2-word fallback query.
+Assembles the final 1080x1920 vertical Short — one scene per beat/fact, each
+with its own Pexels clip, caption, and optional number badge.
+
+Same precision improvements as the news-style build_video.py:
+  - Clip stretching fixed: resize condition was inverted. Now portrait clips
+    get resize(width=W) so height exceeds H and can be cropped cleanly.
+  - Smarter clip selection: prefers highest-resolution portrait file, with a
+    2-word fallback query if the specific query returns no results.
+  - Caption font 68px → 54px, wrap 18 chars → 26, position 66% → 72%.
+    Multi-scene captions are full sentences, so the wider wrap and smaller
+    font stop them from breaking awkwardly into many short lines.
 """
 import math
 import os
@@ -22,7 +25,7 @@ import requests
 from PIL import Image, ImageDraw, ImageFont
 
 if not hasattr(Image, "ANTIALIAS"):
-    Image.ANTIALIAS = Image.LANCZOS
+    Image.ANTIALIAS = Image.LANCZOS  # Pillow >=10 compat shim for moviepy 1.0.3
 
 from moviepy.editor import (
     AudioFileClip,
@@ -80,12 +83,14 @@ def _render_badge_png(number, size=150):
 
 
 def _best_portrait_file(video_files):
+    """Pick the highest-resolution portrait (h > w) video file available."""
     portrait = [f for f in video_files if f.get("height", 0) > f.get("width", 0)]
     candidates = portrait if portrait else video_files
     return max(candidates, key=lambda f: f.get("width", 0) * f.get("height", 0))
 
 
 def _search_pexels(query, per_page=10):
+    """Search Pexels for portrait clips; returns list of video dicts or []."""
     try:
         resp = requests.get(
             "https://api.pexels.com/videos/search",
@@ -94,12 +99,16 @@ def _search_pexels(query, per_page=10):
             timeout=15,
         )
         resp.raise_for_status()
-        return resp.json().get("videos", [])
-    except Exception:
+        results = resp.json().get("videos", [])
+        print(f"Pexels search '{query}': {len(results)} results")
+        return results
+    except Exception as e:
+        print(f"Pexels search '{query}' failed: {e}")
         return []
 
 
 def _download_and_prepare_clip(video, duration):
+    """Download a Pexels video dict and return a cropped, darkened VideoFileClip."""
     pick = _best_portrait_file(video["video_files"])
     local_path = f"/tmp/pexels_bg_{abs(hash(pick['link']))}.mp4"
     with requests.get(pick["link"], stream=True, timeout=60) as r:
@@ -120,19 +129,30 @@ def _download_and_prepare_clip(video, duration):
 
 
 def _fetch_pexels_clip(query, duration):
+    """
+    Try the exact query first; if no results, fall back to the first two words.
+    Returns a prepared clip or None if everything fails.
+    """
     if not PEXELS_API_KEY:
+        print("Pexels skipped — PEXELS_API_KEY not set")
         return None
     try:
         results = _search_pexels(query, per_page=10)
+
         if not results:
             short_query = " ".join(query.split()[:2])
             if short_query and short_query != query:
                 results = _search_pexels(short_query, per_page=10)
+
         if not results:
+            print(f"Pexels: no results for '{query}', using gradient")
             return None
+
         video = random.choice(results)
         return _download_and_prepare_clip(video, duration)
-    except Exception:
+
+    except Exception as e:
+        print(f"Pexels clip fetch failed for '{query}': {e}")
         return None
 
 
@@ -154,6 +174,13 @@ def _make_gradient_background(duration, color_a=(20, 20, 45), color_b=(95, 20, 1
 
 
 def build_video(scenes, output_path):
+    """
+    scenes: list of dicts, each with:
+        audio_path    — mp3 for this scene's narration
+        visual_query  — Pexels search phrase (or None → gradient)
+        caption_text  — text to display
+        number        — int badge number (or None for hook)
+    """
     visual_clips = []
     overlay_clips = []
     audio_clips = []
@@ -171,10 +198,6 @@ def build_video(scenes, output_path):
         visual_clips.append(bg)
 
         caption_png = _render_caption_png(scene["caption_text"])
-        # Dynamic Y position: clamp so caption bottom never exceeds frame edge.
-        # Long hook lines wrap to 6 lines at 54px = 542px tall — at the hardcoded
-        # 72% position (1382px) that puts the bottom at 1924px, clipping the last
-        # 4px off the 1920px frame. This adjusts upward automatically when needed.
         cap_h = caption_png.shape[0]
         cap_top = min(int(H * 0.72), H - cap_h - 60)
         caption_clip = (

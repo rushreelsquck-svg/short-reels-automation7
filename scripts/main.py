@@ -23,6 +23,30 @@ def run():
     print("[1/5] Writing today's accident video (Claude)...")
     video = generate_accident_video()
     print(f"      -> {video['title']}  ({len(video['beats'])} beats)")
+
+    WORKDIR.mkdir(parents=True, exist_ok=True)
+    scenes = []
+
+    print("[2/5] Generating voiceover for the hook and each beat...")
+    hook_audio = str(WORKDIR / "scene_hook.mp3")
+    generate_voiceover(video["hook"], hook_audio)
+    scenes.append({
+        "audio_path": hook_audio,
+        "visual_query": video.get("hook_visual_query"),
+        "caption_text": video["hook"],
+        "number": None,
+    })
+
+    for i, beat in enumerate(video["beats"]):
+        audio_path = str(WORKDIR / f"scene_{i}.mp3")
+        generate_voiceover(beat["narration"], audio_path)
+        scenes.append({
+            "audio_path": audio_path,
+            "visual_query": beat["visual_query"],
+            "caption_text": beat["narration"],
+            "number": None,
+        })
+
     # Voiced outro
     outro_audio = str(WORKDIR / "scene_outro.mp3")
     generate_voiceover("Follow for more shocking accidents that changed the world.", outro_audio)
@@ -33,24 +57,7 @@ def run():
         "number": None,
     })
 
-    WORKDIR.mkdir(parents=True, exist_ok=True)
-    scenes = []
-
-    print("[2/5] Generating voiceover for the hook and each beat...")
-    hook_audio = str(WORKDIR / "scene_hook.mp3")
-    generate_voiceover(video["hook"], hook_audio)
-    scenes.append({"audio_path": hook_audio, "visual_query": video.get("hook_visual_query"), "caption_text": video["hook"], "number": None})
-
-    for i, beat in enumerate(video["beats"]):
-        audio_path = str(WORKDIR / f"scene_{i}.mp3")
-        generate_voiceover(beat["narration"], audio_path)
-        scenes.append({
-            "audio_path": audio_path,
-            "visual_query": beat["visual_query"],
-            "caption_text": beat["narration"],
-            "number": i + 1,
-        })
-    print(f"      -> {len(scenes)} scenes ready (hook + {len(video['beats'])} beats)")
+    print(f"      -> {len(scenes)} scenes ready (hook + {len(video['beats'])} beats + outro)")
 
     print("[3/5] Building the video...")
     video_path = str(WORKDIR / "output.mp4")

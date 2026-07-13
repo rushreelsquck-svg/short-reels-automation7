@@ -23,6 +23,15 @@ def run():
     print("[1/5] Writing today's accident video (Claude)...")
     video = generate_accident_video()
     print(f"      -> {video['title']}  ({len(video['beats'])} beats)")
+    # Voiced outro
+    outro_audio = str(WORKDIR / "scene_outro.mp3")
+    generate_voiceover("Follow for more shocking accidents that changed the world.", outro_audio)
+    scenes.append({
+        "audio_path": outro_audio,
+        "visual_query": "warning lights control room industrial",
+        "caption_text": "Follow for more shocking accidents that changed the world.",
+        "number": None,
+    })
 
     WORKDIR.mkdir(parents=True, exist_ok=True)
     scenes = []

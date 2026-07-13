@@ -226,7 +226,7 @@ def build_video(scenes, output_path):
     music_files = list(MUSIC_DIR.glob("*.mp3"))
     if music_files:
         music = AudioFileClip(str(random.choice(music_files))).fx(afx.audio_loop, duration=total_duration)
-        music = music.fx(afx.volumex, 0.10)
+        music = music.fx(afx.volumex, 0.18)
         audio_tracks.append(music)
 
     final_audio = CompositeAudioClip(audio_tracks).set_duration(total_duration)
